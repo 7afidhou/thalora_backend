@@ -6,6 +6,12 @@ dist/
 build/
 .out/
 
+models/
+*.pkl
+*.keras
+*.h5
+*.pt
+
 .next/
 .nuxt/
 .svelte-kit/
