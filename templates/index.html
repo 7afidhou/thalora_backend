@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fish Growth Predictor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="page-shell">
+        <section class="info-panel">
+            <p class="eyebrow">Aquaculture Forecast</p>
+            <h1>Predict fish length and weight from water conditions.</h1>
+            <p class="intro">
+                Enter pond measurements to compare predictions from RandomForest, XGBoost, and LightGBM.
+            </p>
+        </section>
+
+        <section class="card">
+            <form id="predict-form" class="predict-form">
+                <div class="field">
+                    <label for="temp">Temperature (C)</label>
+                    <input id="temp" type="number" step="any" name="temp" placeholder="28" required>
+                </div>
+
+                <div class="field">
+                    <label for="turbidity">Turbidity (NTU)</label>
+                    <input id="turbidity" type="number" step="any" name="turbidity" placeholder="15" required>
+                </div>
+
+                <div class="field">
+                    <label for="oxygen">Dissolved Oxygen (g/ml)</label>
+                    <input id="oxygen" type="number" step="any" name="oxygen" placeholder="6.2" required>
+                </div>
+
+                <div class="field">
+                    <label for="ph">pH</label>
+                    <input id="ph" type="number" step="any" name="ph" placeholder="7.5" required>
+                </div>
+
+                <div class="field">
+                    <label for="ammonia">Ammonia (g/ml)</label>
+                    <input id="ammonia" type="number" step="any" name="ammonia" placeholder="0.4" required>
+                </div>
+
+                <div class="field">
+                    <label for="nitrate">Nitrate (g/ml)</label>
+                    <input id="nitrate" type="number" step="any" name="nitrate" placeholder="40" required>
+                </div>
+
+                <div class="field">
+                    <label for="population">Population</label>
+                    <input id="population" type="number" step="any" name="population" placeholder="100" required>
+                </div>
+
+                <button type="submit">Run Prediction</button>
+            </form>
+
+            <div id="result" class="result">
+                Your prediction will appear here after submission.
+            </div>
+        </section>
+    </main>
+    <script>
+        const form = document.getElementById("predict-form");
+        const result = document.getElementById("result");
+
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const payload = {
+                "Temperature (C)": Number(document.getElementById("temp").value),
+                "Turbidity(NTU)": Number(document.getElementById("turbidity").value),
+                "Dissolved Oxygen(g/ml)": Number(document.getElementById("oxygen").value),
+                "PH": Number(document.getElementById("ph").value),
+                "Ammonia(g/ml)": Number(document.getElementById("ammonia").value),
+                "Nitrate(g/ml)": Number(document.getElementById("nitrate").value),
+                "Population": Number(document.getElementById("population").value)
+            };
+
+            result.classList.add("result-visible");
+            result.textContent = "Running prediction...";
+
+            try {
+                const response = await fetch("/api/predict", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    result.textContent = `Error: ${data.error || "Prediction failed"}`;
+                    return;
+                }
+
+                const formatLine = (name) => {
+                    const model = data[name];
+                    return `${name} -> Length: ${model.length.toFixed(2)} cm | Weight: ${model.weight.toFixed(2)} g`;
+                };
+
+                result.innerHTML = [
+                    formatLine("RandomForest"),
+                    formatLine("XGBoost"),
+                    formatLine("LightGBM")
+                ].join("<br>");
+            } catch (error) {
+                result.textContent = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+Tailwind translation guide for static/style.css
+
+Notes
+- Some values use arbitrary utilities like [value] because they are custom colors/shadows.
+- Pseudo-elements and complex multi-layer backgrounds are represented with closest Tailwind-friendly equivalents.
+
+Global / base
+- * { box-sizing: border-box; }
+  Tailwind: box-border (typically applied globally in Tailwind base)
+
+- body
+  CSS:
+  margin: 0;
+  min-height: 100vh;
+  font-family: Outfit, sans-serif;
+  color: #17352e;
+  background: layered radial + linear gradients
+
+  Tailwind:
+  m-0 min-h-screen font-[Outfit,sans-serif] text-[#17352e]
+  bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.85),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(20,108,85,0.16),transparent_28%),linear-gradient(145deg,#edf6f2_0%,#d4eadf_100%)]
+
+Login page selectors (used in templates/login.html)
+- .auth-shell
+  CSS: centered grid wrapper with max width and vertical padding
+  Tailwind: w-[min(520px,calc(100%-32px))] min-h-screen mx-auto grid place-items-center py-7
+
+- .auth-card
+  CSS: glass card look
+  Tailwind:
+  bg-[rgba(255,255,255,0.88)] border border-[rgba(255,255,255,0.7)]
+  backdrop-blur-[16px] rounded-[28px] shadow-[0_24px_70px_rgba(20,62,51,0.16)] p-7
+
+- .eyebrow
+  Tailwind: m-0 mb-3 uppercase tracking-[0.18em] text-[0.78rem] font-bold text-[#146c55]
+
+- .auth-title
+  Tailwind: m-0 text-[clamp(2rem,5vw,3rem)] leading-none
+
+- .auth-copy
+  Tailwind: mt-[14px] mb-6 text-[#58736c] leading-[1.6]
+
+- .predict-form
+  Tailwind: flex flex-col gap-4
+
+- .field
+  Tailwind: flex flex-col gap-2
+
+- .field label
+  Tailwind: text-[0.94rem] font-semibold text-[#17352e]
+
+- .field input
+  Tailwind:
+  w-full border border-[rgba(23,53,46,0.12)] rounded-2xl px-4 py-[14px]
+  font-inherit text-[#17352e] bg-[rgba(255,255,255,0.92)] outline-none
+  transition-[border-color,box-shadow,transform] duration-200 ease-in-out
+
+- .field input:focus
+  Tailwind focus classes:
+  focus:border-[rgba(20,108,85,0.45)] focus:shadow-[0_0_0_4px_rgba(20,108,85,0.12)] focus:-translate-y-px
+
+- .field input::placeholder
+  Tailwind: placeholder:text-[#91a8a1]
+
+- button
+  Tailwind:
+  mt-2 border-0 rounded-[18px] px-[18px] py-[15px] font-inherit font-bold text-[#f7fffb]
+  bg-[linear-gradient(135deg,#146c55_0%,#1b8c6e_100%)] cursor-pointer
+  transition-[transform,box-shadow] duration-200 ease-in-out
+  shadow-[0_14px_30px_rgba(20,108,85,0.22)]
+  hover:-translate-y-0.5 hover:shadow-[0_18px_36px_rgba(20,108,85,0.28)]
+
+- .result
+  Tailwind:
+  mt-5 px-[18px] py-4 rounded-[18px] bg-[rgba(20,108,85,0.08)] text-[#58736c]
+  leading-[1.6] border border-[rgba(20,108,85,0.12)]
+
+- .result-visible
+  Tailwind: text-[#17352e] font-semibold bg-[linear-gradient(135deg,rgba(20,108,85,0.14),rgba(255,255,255,0.9))]
+
+- .error-box
+  Tailwind: text-[#8a1f3d] bg-[linear-gradient(135deg,rgba(208,65,112,0.14),rgba(255,255,255,0.92))] border-[rgba(208,65,112,0.18)]
+
+Other selectors from static/style.css (for non-login pages)
+- .page-shell
+  w-[min(1080px,calc(100%-32px))] mx-auto min-h-screen grid grid-cols-[1.05fr_0.95fr] gap-8 items-center py-12
+
+- .info-panel
+  p-0 pt-6 pb-6 px-2
+
+- .info-panel h1
+  m-0 text-[clamp(2.4rem,5vw,4.5rem)] leading-[0.98] max-w-[10ch]
+
+- .intro
+  max-w-[36rem] mt-[18px] mb-0 text-[1.05rem] leading-[1.7] text-[#58736c]
+
+- .card
+  (same as .auth-card)
+
+- .admin-chip
+  inline-flex items-center gap-3 mt-7 px-[14px] py-[10px] rounded-full
+  bg-[rgba(255,255,255,0.58)] border border-[rgba(20,108,85,0.14)]
+  text-[#58736c] text-[0.95rem]
+
+- .admin-chip a
+  text-[#146c55] font-bold no-underline hover:text-[#0f5744]
+
+Responsive (@media max-width: 860px)
+- .page-shell
+  max-[860px]:grid-cols-1 max-[860px]:gap-5 max-[860px]:py-7
+
+- .info-panel
+  max-[860px]:pt-2 max-[860px]:px-1 max-[860px]:pb-0
+
+- .info-panel h1
+  max-[860px]:max-w-[12ch] max-[860px]:text-[clamp(2.1rem,10vw,3.1rem)]
+
+- .card
+  max-[860px]:p-5 max-[860px]:rounded-[24px]
+
+Example login markup (Tailwind classes directly)
+- <main class="w-[min(520px,calc(100%-32px))] min-h-screen mx-auto grid place-items-center py-7">
+- <section class="bg-[rgba(255,255,255,0.88)] border border-[rgba(255,255,255,0.7)] backdrop-blur-[16px] rounded-[28px] shadow-[0_24px_70px_rgba(20,62,51,0.16)] p-7">
+- <p class="m-0 mb-3 uppercase tracking-[0.18em] text-[0.78rem] font-bold text-[#146c55]">Welcome to</p>
+- <h1 class="m-0 text-[clamp(2rem,5vw,3rem)] leading-none">Fish Monitoring System</h1>
+- <p class="mt-[14px] mb-6 text-[#58736c] leading-[1.6]">...</p>
