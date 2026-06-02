@@ -2,16 +2,30 @@ from flask import Flask, request, jsonify, render_template
 import pickle
 import numpy as np
 import os
+from dotenv import load_dotenv
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 from flask_cors import CORS
+from model_utils import (
+    predict_all,
+    predict_growth,
+    load_growth_models,
+    load_lstm_models
+)
+
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000"])
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://10.130.1.109:3000",
+)
+CORS_ORIGINS_LIST = [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
+CORS(app, origins=CORS_ORIGINS_LIST)
 
 # ===== Paths =====
 MODEL_DIR = "models"
-INFLUX_URL = "http://10.130.1.110:8086"
+INFLUX_URL = os.getenv("INFLUX_URL", "http://10.130.1.110:8086")
 INFLUX_TOKEN = "U3lsdmFpbk1vbnRhZ255RXN0VW5DaGFtcGlvbl9Gb3JtYXRpb25Mb1JhV0FOX1VuaXZfU2F2b2llXzIwMjMhCg=="
 INFLUX_ORG = "training-usmb"
 INFLUX_BUCKET = "iot-platform"
@@ -26,37 +40,11 @@ write_api = client.write_api(write_options=SYNCHRONOUS)
 query_api = client.query_api()
 
 
-# ===== Load models =====
-# RandomForest
-def load_models():
-    global rf_len, rf_w, xgb_len, xgb_w, lgb_len, lgb_w, scaler
-
-    with open(os.path.join(MODEL_DIR, "RandomForest_length.pkl"), "rb") as f:
-        rf_len = pickle.load(f)
-
-    with open(os.path.join(MODEL_DIR, "RandomForest_weight.pkl"), "rb") as f:
-        rf_w = pickle.load(f)
-
-    with open(os.path.join(MODEL_DIR, "XGBoost_length.pkl"), "rb") as f:
-        xgb_len = pickle.load(f)
-
-    with open(os.path.join(MODEL_DIR, "XGBoost_weight.pkl"), "rb") as f:
-        xgb_w = pickle.load(f)
-
-    with open(os.path.join(MODEL_DIR, "LightGBM_length.pkl"), "rb") as f:
-        lgb_len = pickle.load(f)
-
-    with open(os.path.join(MODEL_DIR, "LightGBM_weight.pkl"), "rb") as f:
-        lgb_w = pickle.load(f)
-
-    with open(os.path.join(MODEL_DIR, "scaler1.pkl"), "rb") as f:
-        scaler = pickle.load(f)
 
 # ===== Home route =====
 @app.route("/")
 def home():
     return render_template("index.html")
-
 
 @app.route("/add-data", methods=["POST"])
 def add_data():
@@ -83,11 +71,6 @@ def add_data():
     return jsonify({
         "message": "Data written successfully"
     })
-
-# =====================================================
-# GET METHOD
-# =====================================================
-
 
 @app.route("/get-data", methods=["GET"])
 def get_data():
@@ -158,10 +141,6 @@ def get_last_sensors_value():
 
     return jsonify({})
 
-# =====================================================
-# DAILY AVERAGE
-# =====================================================
-
 @app.route("/daily-average", methods=["GET"])
 def daily_average():
 
@@ -230,11 +209,6 @@ from(bucket: "{INFLUX_BUCKET}")
             })
 
     return jsonify(results)
-
-
-# =====================================================
-# WEEKLY AVERAGE
-# =====================================================
 
 @app.route("/weekly-average", methods=["GET"])
 def weekly_average():
@@ -374,191 +348,58 @@ def monthly_average():
 
     return jsonify(results)
 
-
-# ===== Prediction route =====
 @app.route("/predict", methods=["POST"])
 def predict():
     try:
+
         data = request.get_json(silent=True) or {}
-        print(data)
 
-        # ===== DEFAULT INPUTS =====
-        default_inputs = {
-            "Temperature (C)": 0.0,
-            "Turbidity(NTU)": 0.0,
-            "Dissolved Oxygen(g/ml)": 0.0,
-            "PH": 7.0,
-            "Population": 0.0
-        }
-
-        # ===== SAFE NUMERIC PARSER =====
-        def get_numeric_value(field_name):
-            raw_value = data.get(field_name, default_inputs[field_name])
-
-            try:
-                return float(raw_value)
-            except (TypeError, ValueError):
-                return default_inputs[field_name]
-
-        # ===== RAW SENSOR INPUTS =====
-        temp = get_numeric_value("Temperature (C)")
-        turb = get_numeric_value("Turbidity(NTU)")
-        do   = get_numeric_value("Dissolved Oxygen(g/ml)")
-        ph   = get_numeric_value("PH")
-        pop  = get_numeric_value("Population")
-
-        # ======================================================
-        # SMART AMMONIA / NITRATE SUBSTITUTION
-        # ======================================================
-
-        # Quantile-based realistic defaults
-        NH3_LOW  = 0.458
-        NH3_MED  = 0.616
-        NH3_HIGH = 16.50
-
-        NO3_LOW  = 150
-        NO3_MED  = 383
-        NO3_HIGH = 843
-
-        nh3_input = data.get("Ammonia(g/ml)")
-        no3_input = data.get("Nitrate(g/ml)")
-
-        # If real sensor values are provided
-        if nh3_input is not None and no3_input is not None:
-
-            try:
-                nh3 = float(nh3_input)
-            except:
-                nh3 = NH3_MED
-
-            try:
-                no3 = float(no3_input)
-            except:
-                no3 = NO3_MED
-
-        else:
-
-            # ===== ENVIRONMENTAL ESTIMATION =====
-
-            # Polluted water
-            if turb > 15 or do < 4 or pop > 1000:
-                nh3 = NH3_HIGH
-                no3 = NO3_HIGH
-
-            # Moderate water quality
-            elif turb > 7 or do < 6:
-                nh3 = NH3_MED
-                no3 = NO3_MED
-
-            # Clean water
-            else:
-                nh3 = NH3_LOW
-                no3 = NO3_LOW
-
-        # ======================================================
-        # TRANSFORMS
-        # ======================================================
-
-        pop  = np.log1p(max(pop, 0))
-        nh3  = np.log1p(max(nh3, 0))
-        no3  = np.log1p(max(no3, 0))
-        turb = np.log1p(max(turb, 0))
-
-        # ======================================================
-        # FEATURE ENGINEERING
-        # ======================================================
-
-        temp_do    = temp * do
-        ammonia_do = nh3 / (do + 1e-6)
-        nitrate_ph = no3 * ph
-        nh3_no3    = nh3 + no3
-        temp_sq    = temp ** 2
-        do_ph      = do * ph
-
-        # ======================================================
-        # FEATURE VECTOR
-        # ======================================================
-
-        features = [
-            temp,
-            turb,
-            do,
-            ph,
-            nh3,
-            no3,
-            pop,
-            temp_do,
-            ammonia_do,
-            nitrate_ph,
-            nh3_no3,
-            temp_sq,
-            do_ph
-        ]
-
-        # Convert to numpy array
-        features = np.array(features).reshape(1, -1)
-
-        # Scale features
-        features_scaled = scaler.transform(features)
-
-        # ======================================================
-        # PREDICTION FUNCTION
-        # ======================================================
-
-        def predict_model(model_len, model_w):
-            return {
-                "length": float(
-                    np.expm1(model_len.predict(features_scaled))[0]
-                ),
-                "weight": float(
-                    np.expm1(model_w.predict(features_scaled))[0]
-                )
-            }
-
-        # ======================================================
-        # MODEL PREDICTIONS
-        # ======================================================
-
-        rf_pred  = predict_model(rf_len, rf_w)
-        xgb_pred = predict_model(xgb_len, xgb_w)
-        lgb_pred = predict_model(lgb_len, lgb_w)
-        ensemble_length = (
-    rf_pred["length"] +
-    xgb_pred["length"] +
-    lgb_pred["length"]
-) / 3
-        ensemble_weight = (
-    rf_pred["weight"] +
-    xgb_pred["weight"] +
-    lgb_pred["weight"]
-) / 3
-        results = {
-    "Ensemble": {
-        "length": ensemble_length,
-        "weight": ensemble_weight
-    },
-
-    "models": {
-        "RandomForest": rf_pred,
-        "XGBoost": xgb_pred,
-        "LightGBM": lgb_pred
-    },
-
-    "estimated_water_quality": {
-        "ammonia_used": float(np.expm1(nh3)),
-        "nitrate_used": float(np.expm1(no3))
-    }
-}
-        return jsonify(results)
+        return jsonify(
+            predict_growth(data)
+        )
 
     except Exception as e:
+
         return jsonify({
             "error": str(e)
+        }), 500
+SEQUENCE_LENGTH = 50
+@app.route("/predict_future", methods=["POST"])
+def predictt():
+
+    try:
+
+        data = request.get_json()
+
+        sequence = np.array(
+            data["sequence"],
+            dtype=float
+        )
+
+        if sequence.shape != (SEQUENCE_LENGTH, 4):
+
+            return jsonify({
+                "success": False,
+                "message":
+                "Expected shape (10,4)"
+            }), 400
+
+        prediction = predict_all(sequence)
+
+        return jsonify({
+            "success": True,
+            "prediction": prediction
         })
 
+    except Exception as e:
 
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
 
 
 if __name__ == "__main__":
-    load_models()
+    load_lstm_models()
+    load_growth_models()
     app.run(debug=True)
