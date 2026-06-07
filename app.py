@@ -99,7 +99,7 @@ def get_data():
                 "temperature": record.values.get("temperature"),
                 "pressure": record.values.get("pressure"),
                 "ph": record.values.get("ph"),
-                "turbidity": record.values.get("turbidity"),
+                "turbidity": record.values.get("turbidity") /10,
                 "dissolved_oxygen": record.values.get("dissolved_oxygen"),
                 "depth": record.values.get("depth"),
                 "tds"   : record.values.get("tds")
@@ -133,7 +133,7 @@ def get_last_sensors_value():
                 "temperature": record.values.get("temperature"),
                 "pressure": record.values.get("pressure"),
                 "ph": record.values.get("ph"),
-                "turbidity": record.values.get("turbidity"),
+                "turbidity": record.values.get("turbidity")/10,
                 "dissolved_oxygen": record.values.get("dissolved_oxygen"),
                 "depth": record.values.get("depth"),
                 "tds"   : record.values.get("tds")
@@ -188,7 +188,7 @@ from(bucket: "{INFLUX_BUCKET}")
                     else 0,
 
                 "turbidity_avg":
-                    round(record.values.get("turbidity"), 2)
+                    round(record.values.get("turbidity"), 2) /10
                     if record.values.get("turbidity") is not None
                     else 0,
 
@@ -258,7 +258,7 @@ from(bucket: "{INFLUX_BUCKET}")
                     else 0,
 
                 "turbidity_avg":
-                    round(record.values.get("turbidity"), 2)
+                    round(record.values.get("turbidity"), 2)/10
                     if record.values.get("turbidity") is not None
                     else 0,
 
@@ -327,7 +327,7 @@ def monthly_average():
                     else 0,
 
                 "turbidity_avg":
-                    round(record.values.get("turbidity"), 2)
+                    round(record.values.get("turbidity"), 2)/10
                     if record.values.get("turbidity") is not None
                     else 0,
 
@@ -348,7 +348,7 @@ def monthly_average():
 
     return jsonify(results)
 
-@app.route("/predict", methods=["POST"])
+@app.route("/predict_length_weight", methods=["POST"])
 def predict():
     try:
 
@@ -364,7 +364,7 @@ def predict():
             "error": str(e)
         }), 500
 SEQUENCE_LENGTH = 50
-@app.route("/predict_future", methods=["POST"])
+@app.route("/predict_future_values", methods=["POST"])
 def predictt():
 
     try:
@@ -398,6 +398,56 @@ def predictt():
             "message": str(e)
         }), 500
 
+
+
+@app.route("/read_sequence", methods=["GET"])
+def read_sequence():
+
+    query = f'''
+    from(bucket: "{INFLUX_BUCKET}")
+      |> range(start: -30d)
+      |> filter(fn: (r) => r["_measurement"] == "{MEASUREMENT}")
+      |> pivot(
+          rowKey: ["_time"],
+          columnKey: ["_field"],
+          valueColumn: "_value"
+      )
+      |> sort(columns: ["_time"], desc: true)
+      |> limit(n: {SEQUENCE_LENGTH})
+    '''
+
+    tables = query_api.query(query)
+
+    sequence = []
+
+    for table in tables:
+        for record in table.records:
+
+            sequence.append([
+                float(record.values.get("temperature", 0)),
+                float(record.values.get("turbidity", 0)) /10,
+                float(record.values.get("dissolved_oxygen", 0)),
+                float(record.values.get("ph", 0))
+            ])
+
+    if len(sequence) < SEQUENCE_LENGTH:
+
+        return jsonify({
+            "success": False,
+            "message":
+                f"Not enough data points. "
+                f"Expected {SEQUENCE_LENGTH}, "
+                f"got {len(sequence)}"
+        }), 400
+
+    # oldest -> newest
+    sequence.reverse()
+
+    return jsonify({
+        "success": True,
+        "sequence_length": len(sequence),
+        "sequence": sequence
+    })
 
 if __name__ == "__main__":
     load_lstm_models()
