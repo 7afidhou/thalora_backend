@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify, render_template
-import pickle
 import numpy as np
 import os
 from dotenv import load_dotenv
@@ -26,10 +25,10 @@ CORS(app, origins=CORS_ORIGINS_LIST)
 # ===== Paths =====
 MODEL_DIR = "models"
 INFLUX_URL = os.getenv("INFLUX_URL", "http://10.130.1.110:8086")
-INFLUX_TOKEN = "U3lsdmFpbk1vbnRhZ255RXN0VW5DaGFtcGlvbl9Gb3JtYXRpb25Mb1JhV0FOX1VuaXZfU2F2b2llXzIwMjMhCg=="
-INFLUX_ORG = "training-usmb"
-INFLUX_BUCKET = "iot-platform"
-MEASUREMENT="stm32"
+INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
+INFLUX_ORG = os.getenv("INFLUX_ORG")
+INFLUX_BUCKET = os.getenv("INFLUX_BUCKET")
+MEASUREMENT=os.getenv("MEASUREMENT")
 client = InfluxDBClient(
     url=INFLUX_URL,
     token=INFLUX_TOKEN,
@@ -99,7 +98,7 @@ def get_data():
                 "temperature": record.values.get("temperature"),
                 "pressure": record.values.get("pressure"),
                 "ph": record.values.get("ph"),
-                "turbidity": record.values.get("turbidity") /10,
+                "turbidity": record.values.get("turbidity"),
                 "dissolved_oxygen": record.values.get("dissolved_oxygen"),
                 "depth": record.values.get("depth"),
                 "tds"   : record.values.get("tds")
@@ -133,7 +132,7 @@ def get_last_sensors_value():
                 "temperature": record.values.get("temperature"),
                 "pressure": record.values.get("pressure"),
                 "ph": record.values.get("ph"),
-                "turbidity": record.values.get("turbidity")/10,
+                "turbidity": record.values.get("turbidity"),
                 "dissolved_oxygen": record.values.get("dissolved_oxygen"),
                 "depth": record.values.get("depth"),
                 "tds"   : record.values.get("tds")
@@ -188,7 +187,7 @@ from(bucket: "{INFLUX_BUCKET}")
                     else 0,
 
                 "turbidity_avg":
-                    round(record.values.get("turbidity"), 2) /10
+                    round(record.values.get("turbidity"), 2) 
                     if record.values.get("turbidity") is not None
                     else 0,
 
@@ -258,7 +257,7 @@ from(bucket: "{INFLUX_BUCKET}")
                     else 0,
 
                 "turbidity_avg":
-                    round(record.values.get("turbidity"), 2)/10
+                    round(record.values.get("turbidity"), 2)
                     if record.values.get("turbidity") is not None
                     else 0,
 
@@ -327,7 +326,7 @@ def monthly_average():
                     else 0,
 
                 "turbidity_avg":
-                    round(record.values.get("turbidity"), 2)/10
+                    round(record.values.get("turbidity"), 2)
                     if record.values.get("turbidity") is not None
                     else 0,
 
@@ -424,11 +423,11 @@ def read_sequence():
         for record in table.records:
 
             sequence.append([
-                float(record.values.get("temperature", 0)),
-                float(record.values.get("turbidity", 0)) /10,
-                float(record.values.get("dissolved_oxygen", 0)),
-                float(record.values.get("ph", 0))
-            ])
+    float(record.values.get("temperature") or 0),
+    float(record.values.get("turbidity") or 0),
+    float(record.values.get("dissolved_oxygen") or 0),
+    float(record.values.get("ph") or 0)
+])
 
     if len(sequence) < SEQUENCE_LENGTH:
 
